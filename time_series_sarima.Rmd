@@ -1,0 +1,573 @@
+---
+title: "Time Series Analysis"
+author: "Amba Sharma"
+date: "2025-04-11"
+output: 
+  github_document:
+    fig_width: 10
+    fig_height: 6
+---
+
+## Introduction
+
+This project analyses monthly temperature data for Rome, Italy, using time series forecasting methods. The objective is to forecast maximum and minimum air temperatures for 2023-2024 using historical data from 2014-2022, then validate the model by comparing predictions against actual observed values.
+
+The analysis applies the Box-Jenkins methodology, fitting Seasonal ARIMA (SARIMA) models to capture both short-term autocorrelation and annual seasonality in temperature patterns.
+
+## Maximal Temperature Analysis
+
+### Exploratory Data Analysis
+
+```{r}
+library(readxl)
+weather <- read_excel("~/Documents/year-two/survival-models /report /weather.xlsx", sheet = "forecasting")
+head(weather)
+
+
+hightemp <- ts(weather$highest, start = c(2014,1), frequency = 12)
+plot(hightemp,
+     main = "Monthly Maximal Temperature in Rome",
+     ylab ="Temperature in degrees",
+     xlab = "Year")
+```
+The time series plot reveals clear seasonal patterns, with temperature peaks occurring around mid-year (summer months) and troughs at the start and end of each year (winter months). The cycles repeat approximately every 12 months, indicating strong seasonality. There is no obvious long-term upward or downward trend in the data.
+
+### Autocorrelation Analysis
+
+```{r}
+acf(hightemp, lag.max = 24, main = "ACF of Maximal Temperatures")
+
+```
+
+The autocorrelation function (ACF) was calculated for lags up to 24 months. The results show strong positive autocorrelation at lag 1 (0.79), confirming significant month-to-month correlation. A prominent spike at lag 12 indicates strong yearly seasonality. Several lags exceed the 95% confidence bounds (shown as blue dashed lines), particularly at lags 1, 2, and 12. This pattern suggests the series exhibits both short-term memory and strong seasonal effects.
+
+```{r}
+
+acfresults <- acf(hightemp, lag.max = 24, plot = FALSE)
+acfresults
+```
+
+The numerical ACF values confirm these observations: lag 1 shows a correlation of 0.788, indicating very strong month-to-month dependence, while lag 12 shows a correlation of 0.661, reflecting the annual seasonal cycle. Negative correlations appear at lags 5-9, which likely reflect the transition periods between seasons.
+
+```{r}
+
+pacf(hightemp, lag.max = 24, main = "PACF of Maximal Temperatures")
+```
+
+The partial autocorrelation function (PACF) shows a strong spike at lag 1, with most subsequent values falling within the confidence bounds. This suggests that an AR(1) component could explain much of the autocorrelation structure, and that higher-order AR terms are unlikely to be necessary.
+
+Based on this exploratory analysis, the data exhibits no clear long-term trend, strong 12-month seasonality, and significant short-term memory. These characteristics suggest a Seasonal ARIMA (SARIMA) model would be appropriate.
+
+### Model Fitting and Forecasting
+
+```{r}
+library(forecast)
+fit <- auto.arima(hightemp, seasonal = TRUE)
+
+summary(fit)
+forecasthighest <- forecast(fit, h =24)
+plot (forecasthighest)
+```
+
+### Model Validation
+
+```{r}
+library(readxl)
+weather <- read_excel("~/Documents/year-two/survival-models /report /weather.xlsx", sheet = "actual")
+head(weather)
+
+#Create time series from highest column 
+hightemp2 <- ts(weather$highest, start = c(2014,1), frequency = 12)
+plot(hightemp2,
+     main = "Monthly Maximal Temperature in Rome 2014 - 2024",
+     ylab ="Temperature in degrees",
+     xlab = "Year")
+
+#Comparing the graphs 
+accuracy(forecasthighest,hightemp2)
+
+
+
+```
+
+The accuracy metrics indicate strong model performance. Mean Error (ME) is low, suggesting minimal bias in the forecasts. Root Mean Square Error (RMSE) and Mean Absolute Error (MAE) are both low, confirming forecasting accuracy. The Mean Absolute Percentage Error (MAPE) is below 5% for both training and test sets, indicating strong predictive accuracy. Mean Absolute Scaled Error (MASE) and Theil's U statistic are both less than one, confirming that the SARIMA model outperforms a naive baseline forecast.
+
+```{r}
+#check residuals 
+checkresiduals(fit)
+```
+
+The Ljung-Box test assesses whether significant autocorrelation remains in the model residuals. A p-value of 0.9628 indicates we cannot reject the null hypothesis that the residuals are uncorrelated. This confirms the residuals behave like white noise, suggesting the model has adequately captured the temporal structure of the series.
+
+
+The fitted model is ARIMA(0,0,0)(1,1,1)[12], meaning it contains no non-seasonal ARIMA terms but includes seasonal AR(1), differencing of order 1, and seasonal MA(1) components with a 12-month period. This indicates the model relies primarily on annual seasonal patterns for prediction.
+
+The residual diagnostic plots provide further validation. The residuals over time appear reasonably random with no obvious trend or seasonality, though some clustering and outliers are visible around
+
+
+```{r}
+auto.arima(hightemp, seasonal =TRUE)
+```
+## Minimal Temperature Analysis
+
+### Exploratory Data Analysis
+
+```{r}
+library(readxl)
+weather <- read_excel("~/Documents/year-two/survival-models /report /weather.xlsx", sheet = "forecasting")
+head(weather)
+
+#Create time series from highest column 
+lowtemp <- ts(weather$lowest, start = c(2014,1), frequency = 12)
+plot(lowtemp,
+     main = "Monthly Minimal Temperature in Rome",
+     ylab ="Temperature in degrees",
+     xlab = "Year")
+```
+
+The minimal temperature series displays clear seasonality, with consistent dips each winter and rises each summer. There is no obvious long-term trend, only recurring annual cycles. The overall structure mirrors the maximal temperature series but operates within a lower temperature range and exhibits slightly more variability.
+
+### Autocorrelation Analysis
+
+```{r}
+acf(lowtemp, lag.max = 24, main = "ACF of Minimal Temperatures")
+
+acfresults2 <- acf(lowtemp, lag.max = 24, plot = FALSE)
+acfresults2
+```
+
+The ACF shows strong positive autocorrelation at lags 1, 2, and 12, confirming both short-term dependence and annual seasonality. Negative autocorrelation between lags 4-9 likely reflects mid-season transitions between summer and winter periods.
+
+```{r}
+pacf(lowtemp, lag.max = 24, main = "PACF of Minimal Temperatures")
+```
+
+The PACF displays a large spike at lag 1, suggesting a strong AR(1) component. Some minor spikes appear at higher lags (around 9-10), but most values fall within the confidence bounds. This indicates the non-seasonal AR component is likely AR(1).
+
+### Model Fitting and Forecasting
+
+```{r}
+library(forecast)
+fit2 <- auto.arima(lowtemp, seasonal = TRUE)
+
+summary(fit2)
+```
+
+The fitted SARIMA(2,0,2)(2,1,1)[12] model shows all coefficients within the bounds of -1 to 1, indicating model stability. The MAPE metric returns infinity due to actual temperature values near or below zero, which causes division errors — this metric should be disregarded for this series. The model captures the seasonal structure effectively through seasonal differencing (D=1) and seasonal AR and MA terms.
+
+```{r}
+forecastlowest <- forecast(fit2, h =24)
+plot (forecastlowest)
+```
+
+### Model Validation
+
+```{r}
+library(readxl)
+weather <- read_excel("~/Documents/year-two/survival-models /report /weather.xlsx", sheet = "actual")
+head(weather)
+
+#Create time series from highest column 
+lowtemp2 <- ts(weather$lowest, start = c(2014,1), frequency = 12)
+plot(lowtemp2,
+     main = "Monthly Minimal temperature in Rome 2014 - 2024",
+     ylab ="Temperature in degrees",
+     xlab = "Year")
+
+#Comparing the graphs 
+accuracy(forecastlowest, lowtemp2)
+```
+
+```{r}
+#check residuals 
+checkresiduals(fit2)
+```
+
+The Ljung-Box test (Q* = 14.52, p = 0.4863) confirms that the residuals show no significant autocorrelation, validating the model fit.
+
+The residual diagnostics support model adequacy. The residuals over time show no systematic trend or pattern, appearing as random variation around zero with one notable outlier around 2021-2022. The ACF of residuals shows most values within the 95% confidence bounds, indicating the model has successfully captured the autocorrelation structure. The histogram of residuals is approximately bell-shaped with slight right skew and heavier tails than ideal, which is typical for climate data.
+
+```{r}
+auto.arima(lowtemp, seasonal =TRUE)
+```
+
+The SARIMA(2,0,2)(2,1,1)[12] model performs well on the training data, with RMSE = 1.92 and MASE = 0.61 (below 1, indicating better performance than a naive forecast). Test set errors are slightly higher (RMSE = 2.93, MASE = 1.03), which indicates some generalisation loss but is expected when forecasting out of sample. MAPE cannot be evaluated due to near-zero actual values causing division errors. The residuals show minimal remaining autocorrelation, confirming model adequacy.
+
+## Stationarity Testing
+
+The Augmented Dickey-Fuller (ADF) test formally assesses whether a time series is stationary. A stationary series has constant mean and variance over time, which is a key assumption for ARIMA modelling.
+
+```{r}
+library (tseries)
+adf.test(hightemp)
+adf.test(lowtemp)
+
+
+#applying seasonal differencing 
+tempdiff <- diff(hightemp, lag = 12)
+adf.test(tempdiff)
+
+tempdiff2 <- diff(lowtemp, lag = 12)
+adf.test(tempdiff2)
+```
+
+The Augmented Dickey-Fuller test was applied to both the original and seasonally differenced series. In all cases, the p-value was below 0.01, indicating that the null hypothesis of non-stationarity can be rejected. This confirms that the series are stationary, especially after seasonal differencing with a lag of 12, aligning with our earlier visual and ACF/PACF checks.
+
+
+### Forecast Comparison Visualisation
+
+The following visualisation compares the SARIMA model forecasts against actual observed temperatures for 2023-2024. The shaded regions represent 80% and 95% prediction intervals, with the blue line showing forecasted values and the red line showing actual observations.
+
+
+```{r}
+# Load required libraries
+library(forecast)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Extract the time information
+time_forecast <- time(forecasthighest)
+time_actual <- time(hightemp2)
+
+# Print lengths to identify the issue
+cat("Length of time_forecast:", length(time_forecast), "\n")
+cat("Length of forecasthighest$mean:", length(forecasthighest$mean), "\n")
+cat("Length of time_actual:", length(time_actual), "\n")
+cat("Length of hightemp2:", length(hightemp2), "\n")
+cat("Length of hightemp:", length(hightemp), "\n")
+
+# Create data frame for actual data
+df_actual <- data.frame(
+  time = time_actual,
+  temperature = as.numeric(hightemp2),
+  type = "Actual"
+)
+
+# For historical data up to 2022
+historical_end <- length(hightemp)
+df_historical <- data.frame(
+  time = time_actual[1:historical_end],
+  temperature = as.numeric(hightemp),
+  type = "Historical"
+)
+
+# For forecast part (2023-2024)
+# Make sure all vectors have the same length
+forecast_length <- length(forecasthighest$mean)
+# If time_forecast doesn't have correct length, create a proper sequence
+if(length(time_forecast) != forecast_length) {
+  # Calculate the starting point for forecast (immediately after historical data)
+  last_historical_time <- max(time_actual[1:historical_end])
+  # Create sequence of times for forecast period
+  time_forecast <- seq(from = last_historical_time + 1/12, 
+                       by = 1/12, 
+                       length.out = forecast_length)
+}
+
+df_forecast <- data.frame(
+  time = time_forecast,
+  temperature = as.numeric(forecasthighest$mean),
+  type = "Forecast",
+  lower80 = as.numeric(forecasthighest$lower[,1]),
+  upper80 = as.numeric(forecasthighest$upper[,1]),
+  lower95 = as.numeric(forecasthighest$lower[,2]),
+  upper95 = as.numeric(forecasthighest$upper[,2])
+)
+
+# Combine all data
+df_combined <- rbind(
+  df_historical[, c("time", "temperature", "type")],
+  df_forecast[, c("time", "temperature", "type")],
+  df_actual[, c("time", "temperature", "type")]
+)
+
+# Create the combined plot
+p <- ggplot() +
+  # Add historical data
+  geom_line(data = df_historical, 
+            aes(x = time, y = temperature, color = type),
+            size = 0.8) +
+  
+  # Add forecast with confidence intervals
+  geom_ribbon(data = df_forecast,
+              aes(x = time, ymin = lower95, ymax = upper95),
+              fill = "lightblue", alpha = 0.3) +
+  geom_ribbon(data = df_forecast,
+              aes(x = time, ymin = lower80, ymax = upper80),
+              fill = "lightblue", alpha = 0.5) +
+  geom_line(data = df_forecast,
+            aes(x = time, y = temperature, color = type),
+            size = 1) +
+  
+  # Add actual data for 2023-2024 for comparison
+  geom_line(data = df_actual[df_actual$time >= min(df_forecast$time),],
+            aes(x = time, y = temperature, color = type),
+            size = 1, linetype = "solid") +
+  
+  # Customize colors and labels
+  scale_color_manual(values = c("Historical" = "gray", 
+                                "Forecast" = "blue", 
+                                "Actual" = "red"),
+                     name = "Data Type") +
+  
+  # Add titles and labels
+  labs(title = "Monthly Maximal Temperature in Rome: Forecast vs Actual",
+       subtitle = "Comparison between ARIMA(0,0,0)(1,1,1)[12] forecast and actual values",
+       x = "Year",
+       y = "Temperature (°C)") +
+  
+  # Add a vertical line to separate historical data and forecast
+  geom_vline(xintercept = max(df_historical$time), 
+             linetype = "dashed", color = "darkgray") +
+  
+  # Customize the theme
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        plot.title = element_text(face = "bold"),
+        axis.title = element_text(face = "bold"))
+
+# Display the plot
+print(p)
+
+# Save the plot if needed
+ggsave("maximal_temperature_comparison.png", p, width = 10, height = 6, dpi = 300)
+
+# If you want a more focused plot showing just 2023-2024 comparison:
+p_focused <- ggplot() +
+  # Add forecast with confidence intervals
+  geom_ribbon(data = df_forecast,
+              aes(x = time, ymin = lower95, ymax = upper95),
+              fill = "lightblue", alpha = 0.3) +
+  geom_ribbon(data = df_forecast,
+              aes(x = time, ymin = lower80, ymax = upper80),
+              fill = "lightblue", alpha = 0.5) +
+  geom_line(data = df_forecast,
+            aes(x = time, y = temperature, color = type),
+            size = 1) +
+  
+  # Add actual data for 2023-2024 for comparison
+  geom_line(data = df_actual[df_actual$time >= min(df_forecast$time),],
+            aes(x = time, y = temperature, color = type),
+            size = 1) +
+  
+  # Customize colors and labels
+  scale_color_manual(values = c("Forecast" = "blue", 
+                                "Actual" = "red"),
+                     name = "Data Type") +
+  
+  # Add titles and labels
+  labs(title = "2023-2024 Maximal Temperature in Rome: Forecast vs Actual",
+       subtitle = "Detailed comparison of forecast performance",
+       x = "Year",
+       y = "Temperature (°C)") +
+  
+  # Customize the theme
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        plot.title = element_text(face = "bold"),
+        axis.title = element_text(face = "bold"))
+
+# Display the focused plot
+print(p_focused)
+
+# Save the focused plot if needed
+ggsave("maximal_temperature_comparison_2023_2024.png", p_focused, width = 8, height = 5, dpi = 300)
+```
+### Forecast Comparison Visualisation
+
+This plot compares the minimal temperature SARIMA forecasts against actual values for 2023-2024, with prediction intervals shown as shaded regions.
+
+
+```{r}
+# Historical data
+historical_values <- as.numeric(lowtemp)
+historical_dates <- time(lowtemp)
+
+# Forecast data
+forecast_values <- as.numeric(forecastlowest$mean)
+forecast_lower80 <- as.numeric(forecastlowest$lower[,1])
+forecast_upper80 <- as.numeric(forecastlowest$upper[,1]) 
+forecast_lower95 <- as.numeric(forecastlowest$lower[,2])
+forecast_upper95 <- as.numeric(forecastlowest$upper[,2])
+
+# Create proper forecast dates
+forecast_length <- length(forecast_values)
+last_historical_date <- max(historical_dates)
+forecast_dates <- seq(from = last_historical_date + 1/12, 
+                      by = 1/12, 
+                      length.out = forecast_length)
+
+# Actual data (complete series)
+actual_values <- as.numeric(lowtemp2)
+actual_dates <- time(lowtemp2)
+
+
+# Historical data
+df_historical <- data.frame(
+  date = historical_dates,
+  temperature = historical_values,
+  type = "Historical"
+)
+
+# Forecast data
+df_forecast <- data.frame(
+  date = forecast_dates,
+  temperature = forecast_values,
+  lower80 = forecast_lower80,
+  upper80 = forecast_upper80,
+  lower95 = forecast_lower95,
+  upper95 = forecast_upper95,
+  type = "Forecast"
+)
+
+# Find the index where forecast period starts in actual data
+forecast_start_idx <- which(actual_dates >= min(forecast_dates))[1]
+# If the index is found, extract the actual data for the forecast period
+if (!is.na(forecast_start_idx)) {
+  df_actual_forecast_period <- data.frame(
+    date = actual_dates[forecast_start_idx:length(actual_dates)],
+    temperature = actual_values[forecast_start_idx:length(actual_values)],
+    type = "Actual"
+  )
+} else {
+  # If no matching dates are found, create an empty data frame
+  df_actual_forecast_period <- data.frame(
+    date = numeric(0),
+    temperature = numeric(0),
+    type = character(0)
+  )
+  warning("No actual data found for the forecast period")
+}
+
+
+p <- ggplot() +
+  # Add historical data
+  geom_line(data = df_historical, 
+            aes(x = date, y = temperature, color = type),
+            size = 0.8) +
+  
+  # Add forecast with confidence intervals
+  geom_ribbon(data = df_forecast,
+              aes(x = date, ymin = lower95, ymax = upper95),
+              fill = "lightblue", alpha = 0.3) +
+  geom_ribbon(data = df_forecast,
+              aes(x = date, ymin = lower80, ymax = upper80),
+              fill = "lightblue", alpha = 0.5) +
+  geom_line(data = df_forecast,
+            aes(x = date, y = temperature, color = type),
+            size = 1) +
+  
+  # Add actual data for the forecast period
+  geom_line(data = df_actual_forecast_period,
+            aes(x = date, y = temperature, color = type),
+            size = 1) +
+  
+  # Add a vertical line to separate historical data and forecast
+  geom_vline(xintercept = max(df_historical$date), 
+             linetype = "dashed", color = "darkgray") +
+  
+  # Customize colors and labels
+  scale_color_manual(values = c("Historical" = "gray", 
+                                "Forecast" = "blue", 
+                                "Actual" = "red"),
+                     name = "Data Type") +
+  
+  # Add titles and labels
+  labs(title = "Monthly Minimal Temperature in Rome: Forecast vs Actual",
+       subtitle = "Comparison between ARIMA(2,0,2)(2,1,1)[12] forecast and actual values",
+       x = "Year",
+       y = "Temperature (°C)") +
+  
+  # Customize the theme
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_line(color = "gray95"),
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.title = element_text(face = "bold")
+  )
+
+# Print the plot
+print(p)
+
+# Save the plot
+ggsave("minimal_temperature_comparison.png", p, width = 10, height = 6, dpi = 300)
+
+
+
+
+```
+
+```{r}
+
+print("Checking vector lengths:")
+print(paste("Length of forecast_dates:", length(forecast_dates)))
+print(paste("Length of forecast_values:", length(forecast_values)))
+print(paste("Length of forecastlowest$lower[,1]:", length(forecastlowest$lower[,1])))
+print(paste("Length of forecastlowest$upper[,1]:", length(forecastlowest$upper[,1])))
+
+
+# First, determine the correct length to use (use the forecast values length)
+forecast_length <- length(forecast_values)
+
+# Then create a proper date sequence starting from January 2023
+# This ensures we have exactly the right number of dates
+forecast_dates_fixed <- seq(from = 2023, by = 1/12, length.out = forecast_length)
+
+# Now create the data frame with vectors of equal length
+df_forecast <- data.frame(
+  date = forecast_dates_fixed,
+  temp = forecast_values,
+  type = "Forecast",
+  lower80 = forecastlowest$lower[,1],
+  upper80 = forecastlowest$upper[,1]
+)
+
+# Find where 2023 starts in the actual data
+year_2023_start <- which(actual_dates >= 2023)[1]
+
+
+df_actual <- data.frame(
+  date = actual_dates[year_2023_start:length(actual_dates)],
+  temp = actual_values[year_2023_start:length(actual_values)],
+  type = "Actual"
+)
+
+# Create the comparison plot
+ggplot() +
+  # Add forecast with confidence intervals
+  geom_ribbon(data = df_forecast,
+              aes(x = date, ymin = lower80, ymax = upper80),
+              fill = "lightblue", alpha = 0.5) +
+  geom_line(data = df_forecast,
+            aes(x = date, y = temp, color = type),
+            size = 1) +
+  # Add actual data
+  geom_line(data = df_actual,
+            aes(x = date, y = temp, color = type),
+            size = 1) +
+  # Customize colors
+  scale_color_manual(values = c("Forecast" = "blue", "Actual" = "red")) +
+  # Add labels
+  labs(title = "Monthly Minimal Temperature in Rome: Forecast vs Actual (2023-2024)",
+       x = "Year",
+       y = "Temperature (°C)",
+       color = "Data Type") +
+  theme_minimal()
+```
+
+## Conclusion
+
+This analysis applied the Box-Jenkins methodology to forecast monthly maximum and minimum temperatures in Rome using SARIMA models. Historical data from 2014-2022 was used for model fitting, with 2023-2024 reserved for validation.
+
+For maximal temperatures, an ARIMA(0,0,0)(1,1,1)[12] model was selected, relying entirely on seasonal components to capture the annual temperature cycle. The model achieved strong predictive accuracy with MAPE below 5% on both training and test sets.
+
+For minimal temperatures, a more complex SARIMA(2,0,2)(2,1,1)[12] model was required, incorporating both non-seasonal and seasonal AR and MA terms. While training performance was strong (MASE = 0.61), test set accuracy showed some degradation, which is expected for out-of-sample forecasting.
+
+Both models passed diagnostic testing, with Ljung-Box tests confirming residuals behaved as white noise. The comparison plots demonstrate that forecasted values closely track actual observations for 2023-2024, validating the applicability of SARIMA models for temperature forecasting.
+
+The analysis demonstrates that seasonal ARIMA models are well-suited for climate data exhibiting strong annual periodicity and short-term autocorrelation.
+
