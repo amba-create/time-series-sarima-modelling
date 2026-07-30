@@ -65,6 +65,3 @@ install.packages(c("forecast", "tseries", "ggplot2", "readxl", "dplyr", "tidyr")
 rmarkdown::render("time_series_sarima.Rmd")
 ```
 
-## Author
-
-**Amba Sharma** — BSc Mathematics (Applied Mathematics emphasis), University of Leicester.
